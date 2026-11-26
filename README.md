@@ -1,4 +1,4 @@
-# org-table-widget
+# org-flow-table
 
 Display Org tables as responsive, pixel-aligned widgets inside ordinary Org
 buffers. It needs nothing but Emacs and Org: cells are measured with
@@ -32,7 +32,7 @@ rendering is built on Emacs itself.
 
 A **graphical Emacs frame** is needed for rendered widgets by default. In a
 terminal, the mode can be enabled, but automatic rendering is skipped and tables
-stay as editable Org source unless `org-table-widget-enable-in-terminal` is
+stay as editable Org source unless `org-flow-table-enable-in-terminal` is
 non-nil.
 
 Terminal rendering is much slower to enable on large tables. After the terminal
@@ -45,14 +45,14 @@ Not on MELPA yet. Install this package on its own; nothing else is needed:
 
 ```elisp
 (require 'package-vc)
-(package-vc-install "https://github.com/yibie/org-table-widget" "v0.3.1")
+(package-vc-install "https://github.com/TomoeMami/org-flow-table")
 ```
 
 Alternatively, clone the repository and add its directory manually:
 
 ```elisp
-(add-to-list 'load-path "/path/to/org-table-widget")
-(require 'org-table-widget)
+(add-to-list 'load-path "/path/to/org-flow-table")
+(require 'org-flow-table)
 ```
 
 ## Usage
@@ -60,13 +60,13 @@ Alternatively, clone the repository and add its directory manually:
 Enable automatically in Org buffers:
 
 ```elisp
-(require 'org-table-widget)
-(add-hook 'org-mode-hook #'org-table-widget-mode)
+(require 'org-flow-table)
+(add-hook 'org-mode-hook #'org-flow-table-mode)
 ```
 
-Use `M-x org-table-widget-mode` to enable or disable it in the current buffer,
-`M-x org-table-widget-toggle` to reveal or render the table at point, and
-`M-x org-table-widget-refresh` to refresh the buffer's tables.
+Use `M-x org-flow-table-mode` to enable or disable it in the current buffer,
+`M-x org-flow-table-toggle` to reveal or render the table at point, and
+`M-x org-flow-table-refresh` to refresh the buffer's tables.
 
 Line motion stops on every row of a table, so long tables can be walked
 through and scrolled like ordinary text. The row that point is on shows its Org
@@ -86,7 +86,7 @@ while point stays on that row: redrawing it there makes the rows around the
 cursor jump, and a run of edits then costs one layout when the row is left
 instead of one per character.
 
-`M-x org-table-widget-toggle` reveals the whole table at point as source, so
+`M-x org-flow-table-toggle` reveals the whole table at point as source, so
 that a command can work on several rows at once, for example `org-table`
 alignment or `#+TBLFM` recalculation. Running it again on the table renders it,
 and moving point out of the table renders it as well; either way the row under
@@ -100,39 +100,39 @@ shows it, aligned with the columns below. The header line holds one line, so a
 header that wraps or spans several rows shows only its first line. Any other
 header line comes back once the header scrolls into view again. The sticky
 header makes scrolling through large tables noticeably less smooth; set
-`org-table-widget-sticky-header` to nil if that matters more.
+`org-flow-table-sticky-header` to nil if that matters more.
 
 ### Options
 
-Customize with `M-x customize-group RET org-table-widget RET`.
+Customize with `M-x customize-group RET org-flow-table RET`.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `org-table-widget-enable-in-terminal` | `nil` | Render table widgets on text terminals as well. |
-| `org-table-widget-zebra-stripe` | `t` | Alternate the background of the drawn rows. |
-| `org-table-widget-wrap-columns` | `t` | Wrap cell content; nil uses natural widths. |
-| `org-table-widget-max-width-fraction` | `1.0` | Fraction of the window body width available to the table. |
-| `org-table-widget-relayout-delay` | `0.15` | Idle seconds before a relayout after a resize or a font change; zero or negative means immediate. |
-| `org-table-widget-sticky-header` | `t` | Keep a scrolled-off table header in the header line. |
-| `org-table-widget-cell-properties` | `(face font-lock-face invisible display mouse-face help-echo keymap follow-link htmlize-link org-emphasis)` | Text properties retained in rendered cells. |
+| `org-flow-table-enable-in-terminal` | `nil` | Render table widgets on text terminals as well. |
+| `org-flow-table-zebra-stripe` | `t` | Alternate the background of the drawn rows. |
+| `org-flow-table-wrap-columns` | `t` | Wrap cell content; nil uses natural widths. |
+| `org-flow-table-max-width-fraction` | `1.0` | Fraction of the window body width available to the table. |
+| `org-flow-table-relayout-delay` | `0.15` | Idle seconds before a relayout after a resize or a font change; zero or negative means immediate. |
+| `org-flow-table-sticky-header` | `t` | Keep a scrolled-off table header in the header line. |
+| `org-flow-table-cell-properties` | `(face font-lock-face invisible display mouse-face help-echo keymap follow-link htmlize-link org-emphasis)` | Text properties retained in rendered cells. |
 
 ### Faces
 
 The rendered table takes three faces, all customizable with
-`M-x customize-group RET org-table-widget RET`:
+`M-x customize-group RET org-flow-table RET`:
 
 | Face | Default | Used for |
 | --- | --- | --- |
-| `org-table-widget-row` | `gray98` / `gray13` background | Drawn rows that are not zebra striped, rules included. |
-| `org-table-widget-zebra` | `gray95` / `gray20` background | Every second drawn row, rules and header rows included, when `org-table-widget-zebra-stripe` is non-nil. |
-| `org-table-widget-header` | inherits `bold` | Header rows, the rows above the first horizontal rule. |
+| `org-flow-table-row` | `gray98` / `gray13` background | Drawn rows that are not zebra striped, rules included. |
+| `org-flow-table-zebra` | `gray95` / `gray20` background | Every second drawn row, rules and header rows included, when `org-flow-table-zebra-stripe` is non-nil. |
+| `org-flow-table-header` | inherits `bold` | Header rows, the rows above the first horizontal rule. |
 
 The bands alternate over every row the rendering draws, so the header rows and
 the horizontal rules are striped along with the data rows and the stripes run
 unbroken through the whole table. A header row keeps its bold face on top of
 its band. Both backgrounds are taken from the buffer background, so the table
 reads as a block of banded rows instead of dissolving into the surrounding
-text. Change them to match your theme; set `org-table-widget-zebra-stripe` to
+text. Change them to match your theme; set `org-flow-table-zebra-stripe` to
 `nil` for a single flat band, which leaves the header bold and the rules
 unbanded.
 
@@ -149,9 +149,9 @@ overlays. The consequences, in short:
 
 - `Package-Requires` lists only Emacs and Org, so `package-vc` and MELPA-style
   installers pull in nothing extra.
-- `(require 'org-table-widget)` no longer loads, or needs, any third-party
+- `(require 'org-flow-table)` no longer loads, or needs, any third-party
   library, so starting the mode cannot fail because something else is missing.
-- The `org-table-widget` widget type still exists, but only as a value holder
+- The `org-flow-table` widget type still exists, but only as a value holder
   for the laid-out table; it uses the `wid-edit` library that ships with Emacs
   and no longer registers a `:textui-layout` function. Code that fed that type
   to TextUI's own `textui-layout-widget` therefore has to render the table
@@ -172,13 +172,13 @@ overlays. The consequences, in short:
 
 ## Compared with valign
 
-`org-table-widget` and [Valign](https://github.com/casouri/valign) share a basic
+`org-flow-table` and [Valign](https://github.com/casouri/valign) share a basic
 promise: both use pixel measurements to align tables without rewriting their
 source text. They work at different layers. Valign visually aligns the existing
-table in place. `org-table-widget` covers the source with a separate, responsive
+table in place. `org-flow-table` covers the source with a separate, responsive
 rendering and shows the source row by row as point moves through the table.
 
-| Capability | `org-table-widget` | Valign |
+| Capability | `org-flow-table` | Valign |
 | --- | --- | --- |
 | Display model | Builds a row-by-row overlay rendering on top of the source table. | Adds display properties and overlays to spaces and separators in the existing table. |
 | Table formats | Org pipe tables. | Org, Markdown and `table.el` tables. |
@@ -192,7 +192,7 @@ rendering and shows the source row by row as point moves through the table.
 
 Choose Valign when the main goal is to keep an Org or Markdown table aligned
 while editing it, especially with variable-pitch text or inline images. Choose
-`org-table-widget` when an Org buffer needs a reading-oriented table that wraps
+`org-flow-table` when an Org buffer needs a reading-oriented table that wraps
 to narrow windows, styles header and alternating rows, and still lets the row
 under point be edited as plain Org source.
 
@@ -218,7 +218,7 @@ Known limitations:
   edge in the meantime, until the table is laid out again on the next move.
 - Numeric columns are not automatically right-aligned; use an explicit `<r>` cookie.
 - The sticky header slows scrolling through large tables, in both directions;
-  set `org-table-widget-sticky-header` to nil to avoid it.
+  set `org-flow-table-sticky-header` to nil to avoid it.
 - Coexistence with `valign` is untested; see above for `org-modern` test coverage.
 
 See [CHANGELOG.md](CHANGELOG.md) for release changes.
@@ -243,9 +243,9 @@ Generate the benchmark inputs
 (including the untracked `huge.org`), then run each GUI script in a separate Emacs:
 
 ```sh
-emacs -Q --batch -l /absolute/path/to/org-table-widget/demos/gen-large.el -f org-table-widget-demo-generate
-emacs -Q -l /absolute/path/to/org-table-widget/demos/bench.el
-emacs -Q -l /absolute/path/to/org-table-widget/demos/visual-check.el
+emacs -Q --batch -l /absolute/path/to/org-flow-table/demos/gen-large.el -f org-flow-table-demo-generate
+emacs -Q -l /absolute/path/to/org-flow-table/demos/bench.el
+emacs -Q -l /absolute/path/to/org-flow-table/demos/visual-check.el
 ```
 
 Replace `/absolute/path/to` with your checkout's parent directory. Scripts write
@@ -254,20 +254,20 @@ ignored logs/profiles under `demos/` and screenshots under `demos/shots/`, then 
 Run the full ERT suite from the repository root; it needs nothing beyond Emacs:
 
 ```sh
-cd /path/to/org-table-widget
-emacs -Q --batch -L . -l org-table-widget.el \
-  -l test/org-table-widget-tests.el -l test/org-table-widget-demo-tests.el \
+cd /path/to/org-flow-table
+emacs -Q --batch -L . -l org-flow-table.el \
+  -l test/org-flow-table-tests.el -l test/org-flow-table-demo-tests.el \
   -f ert-run-tests-batch-and-exit
 ```
 
 The redisplay-dependent motion tests are skipped in batch mode. In a graphical
-Emacs, load `test/org-table-widget-tests.el` and run
+Emacs, load `test/org-flow-table-tests.el` and run
 `M-x ert RET vertical-interactive RET`.
 For the optional org-modern compatibility test, put org-modern and its
-dependencies on `load-path`, load `test/org-table-widget-compat-tests.el`, then
-run `M-x ert RET org-table-widget-compat- RET`.
+dependencies on `load-path`, load `test/org-flow-table-compat-tests.el`, then
+run `M-x ert RET org-flow-table-compat- RET`.
 
 Prefer `--batch` when real pixels are unnecessary. On macOS, the Emacs.app
 launcher ignores the shell working directory, hence the absolute paths above.
 For GUI invocations, use absolute paths for every `-l`, file name in `--eval`,
-and log path, or pass `--chdir /absolute/path/to/org-table-widget` before loading scripts.
+and log path, or pass `--chdir /absolute/path/to/org-flow-table` before loading scripts.

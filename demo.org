@@ -165,9 +165,9 @@ This paragraph immediately follows the second table.
 
 * Quick controls
 
-- =M-x org-table-widget-mode=: enable or disable rendering in this buffer.
-- =M-x org-table-widget-toggle=: reveal the whole table at point as source, or
+- =M-x org-flow-table-mode=: enable or disable rendering in this buffer.
+- =M-x org-flow-table-toggle=: reveal the whole table at point as source, or
   render it again. The row under point stays source either way.
-- =M-x org-table-widget-refresh=: redraw every table in the buffer.
+- =M-x org-flow-table-refresh=: redraw every table in the buffer.
 - Move onto a row to edit its Org source in place: the row under point is never
   rendered, and the other rows stay rendered. Leaving the row renders it again.

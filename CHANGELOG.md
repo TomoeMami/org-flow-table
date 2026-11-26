@@ -1,9 +1,18 @@
 # Changelog
 
+This project was previously released as `org-table-widget`. Release notes
+up to 0.3.1 keep the names the code had then; every later entry uses the
+current `org-flow-table` names.
+
 ## Unreleased
 
 ### Changes
 
+- Rename the package to `org-flow-table`. Every public name follows: the
+  library, `org-flow-table-mode`, the commands, the options and the faces are
+  now prefixed `org-flow-table-`. Nothing else about the package changed, so
+  replace the old prefix in your configuration; the old names are not kept as
+  aliases.
 - Drop the TextUI dependency. Tables are measured with `window-text-pixel-size`
   and laid out by this package, so `Package-Requires` lists only Emacs and Org
   and the mode no longer refuses to start when another library is missing.
@@ -13,15 +22,15 @@
   top and bottom frames and the Unicode box-drawing characters are gone. Header
   rows stay bold, and zebra striping still covers the whole row, separators
   included.
-- Add `org-table-widget-row`, the face for data rows that are not zebra
+- Add `org-flow-table-row`, the face for data rows that are not zebra
   striped. Every data row now takes a background, so the table reads as a block
   of banded rows instead of dissolving into the buffer text; recolor the face,
-  or set `org-table-widget-zebra-stripe` to nil for a single flat band of data
+  or set `org-flow-table-zebra-stripe` to nil for a single flat band of data
   rows.
 - Stripe header rows and horizontal rules along with the data rows. The bands
   alternate over every row the rendering draws, so the stripes run unbroken
   through the whole table instead of starting again below the header. A header
-  row keeps its bold face on top of its band; with `org-table-widget-zebra-stripe`
+  row keeps its bold face on top of its band; with `org-flow-table-zebra-stripe`
   set to nil, the header stays bold without a background and the rules keep the
   buffer background.
 - Render each source row with its own overlay, so the row under point is left
@@ -32,12 +41,12 @@
   point leaves the edited row, so the rows follow the new column widths. It is
   not laid out while point stays there, so typing never redraws the table under
   the cursor.
-- Add `org-table-widget-enable-in-terminal` (default nil) to render table
+- Add `org-flow-table-enable-in-terminal` (default nil) to render table
   widgets on text terminals. Enabling on large tables is much slower there than
   in a graphical frame. Suggested by @hubisan (#7).
 - Keep a table's header visible while scrolling through the table. Once the
   header rows scroll out of view, the window's header line shows them, aligned
-  with the columns below; set `org-table-widget-sticky-header` to nil to turn
+  with the columns below; set `org-flow-table-sticky-header` to nil to turn
   this off. Only the header's first line fits in the header line. Suggested on
   Reddit by u/shipmints and u/vfclists.
   Known issue: while the sticky header is shown, scrolling through large
@@ -46,21 +55,21 @@
 ### Breaking changes
 
 - Remove the TextUI dependency and the `:textui-layout` function it used. The
-  `org-table-widget` widget type is still defined, but only as a value holder
+  `org-flow-table` widget type is still defined, but only as a value holder
   built on the `wid-edit` library that ships with Emacs; it no longer
   registers a layout callback, so a caller that passed it to TextUI's own
   `textui-layout-widget` now has to render the table through this package.
   TextUI need not be installed, and an existing installation can be removed.
-- Remove the `org-table-widget-use-unicode-borders` and
-  `org-table-widget-reveal-on-point` options. Tables now always follow the Org
+- Remove the `org-flow-table-use-unicode-borders` and
+  `org-flow-table-reveal-on-point` options. Tables now always follow the Org
   source table's shape, and the row under point is always shown as source, so
   neither an ASCII/Unicode border choice nor an automatic whole-table reveal
   applies. Remove them from your configuration and customizations.
-- Remove the `org-table-widget-border` face, which styled the frame the
+- Remove the `org-flow-table-border` face, which styled the frame the
   rendering no longer draws.
-- Remove the `org-table-widget-edit` command and the `org-table-widget-map`
+- Remove the `org-flow-table-edit` command and the `org-flow-table-map`
   keymap with its `e` binding. Editing needs no command: move onto a row and
-  edit its source directly. `org-table-widget-toggle` remains, and still
+  edit its source directly. `org-flow-table-toggle` remains, and still
   reveals the whole table at point and renders it again when run a second time
   or when point leaves the table.
 

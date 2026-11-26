@@ -1,5 +1,5 @@
 #+title: Editing flow
-# 1. Enable org-table-widget-mode with point on this comment.
+# 1. Enable org-flow-table-mode with point on this comment.
 # 2. Down stops on each row; the row under point is already source, no key needed.
 # 3. Edit a cell, TAB to the next cell, RET for the next row.
 # 4. C-c C-c to align; recalculate via C-c C-c on the TBLFM line.
