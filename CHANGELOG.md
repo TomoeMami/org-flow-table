@@ -56,6 +56,19 @@
 
 ### Fixes
 
+- Lay rows out without a round trip through text properties. The rendered
+  table was joined into one string and split again, with each row's source line
+  recovered from a text property on it. A rendering that lost that property
+  merged two rows into one, so the table drew short and the rows below shifted.
+  It came and went with the window size and cleared after revealing and
+  redrawing the table, which fits a property that is lost somewhere in the
+  round trip. Rows now come straight from the renderer as (line . string) pairs,
+  and the round trip is gone.
+- Replace a table's overlays before drawing it again, and find them by the
+  table they belong to instead of through the per-row index. An index entry
+  that a later overlay for the same row replaced left an overlay on screen with
+  nothing left to delete it, so it kept drawing over the table.  Drawing a row
+  twice also no longer leaves the earlier overlay behind.
 - Stop rows from being drawn over half a source line. A span was located by
   stepping on from the previous row, so an offset that repeated or went out of
   order moved point backwards and left the span starting inside a line. Only

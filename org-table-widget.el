@@ -947,17 +947,28 @@ They are in buffer order."
    (overlay-get overlay 'org-table-widget-table)))
 
 (defun org-table-widget--drop-table (beg)
-  "Delete every row overlay drawn for the table starting at BEG."
+  "Delete every row overlay drawn for the table starting at BEG.
+The overlays are found from the list of them, not from the index keyed
+by row, so one whose index entry a later overlay for the same row
+replaced is deleted too.  Such an overlay would otherwise stay on screen
+with no way left to reach it, drawing over the table."
   (when beg
     (setq org-table-widget--dirty (delq beg org-table-widget--dirty))
+    (let (keep)
+      (dolist (overlay org-table-widget--overlays)
+        (if (and (overlay-buffer overlay)
+                 (eql (overlay-get overlay 'org-table-widget-table) beg))
+            (delete-overlay overlay)
+          (push overlay keep)))
+      (setq org-table-widget--overlays (nreverse keep)))
     (when org-table-widget--row-index
-      (maphash (lambda (key overlay)
-                 (when (eql (car key) beg)
-                   (delete-overlay overlay)
-                   (remhash key org-table-widget--row-index)))
-               org-table-widget--row-index))
-    (setq org-table-widget--overlays
-          (seq-filter #'overlay-buffer org-table-widget--overlays))))
+      (let (keys)
+        (maphash (lambda (key _overlay)
+                   (when (eql (car key) beg)
+                     (push key keys)))
+                 org-table-widget--row-index)
+        (dolist (key keys)
+          (remhash key org-table-widget--row-index))))))
 
 (defun org-table-widget--remove-overlay (overlay)
   "Delete the row overlays drawing the table OVERLAY is part of."
@@ -1163,11 +1174,19 @@ no table.  Layout is cached per table and reused across relayouts."
       (unless (equal key (car cached))
         (setq cached nil)
         (when-let* ((table (org-table-widget--parse beg end)))
+          ;; Take the rows as (LINE . STRING) straight from the renderer.
+          ;; Going through the laid-out string and splitting it again used to
+          ;; recover each row's source line from a text property, and a
+          ;; rendering that lost that property merged two rows into one: the
+          ;; pair was then drawn on a single line, and the rest of the table
+          ;; shifted.  `textui-layout-widget' only calls the layout function
+          ;; and returns its string, so nothing is gained by the round trip.
           (let* ((widget (widget-convert 'org-table-widget :value table
                                          :window window
                                          :pixel-budget pixel-budget))
-                 (rows (org-table-widget--rows
-                        (textui-layout-widget widget columns)))
+                 (rows (org-table-widget--with-cached-measurements window
+                         (org-table-widget--render-rows
+                          table window columns pixel-budget)))
                  (spans (org-table-widget--drop-empty-spans
                          (org-table-widget--row-spans beg end rows))))
             (widget-put widget :sticky-header
@@ -1180,22 +1199,6 @@ no table.  Layout is cached per table and reused across relayouts."
           ;; Measured here: the header line cannot measure during redisplay.
           (widget-put widget :sticky-indent prefix))
         cached))))
-
-(defun org-table-widget--rows (rendered)
-  "Split RENDERED, one line per row, into (LINE . STRING) pairs.
-RENDERED is the TextUI rendering of a table; lines a row wraps into stay
-with that row, and their text is joined with newlines."
-  (let (rows)
-    (dolist (text (split-string rendered "\n"))
-      (unless (string-empty-p text)
-        (let ((line (or (get-text-property 0 'org-table-widget-line text) 0)))
-          (if (eql line (caar rows))
-              (push text (cdar rows))
-            (push (list line text) rows)))))
-    (nreverse (mapcar (lambda (row)
-                        (cons (car row)
-                              (string-join (nreverse (cdr row)) "\n")))
-                      rows))))
 
 (defun org-table-widget--table-at (position)
   "Return the start of the Org table containing POSITION, or nil."
@@ -1252,6 +1255,13 @@ WIDGET is the laid-out table the rendering of the row belongs to."
                  (list #'org-table-widget--modified))
     (unless org-table-widget--row-index
       (setq org-table-widget--row-index (make-hash-table :test 'equal)))
+    ;; One overlay per row: replacing the index entry of a row drawn before
+    ;; would leave that overlay on screen with nothing pointing at it.
+    (when-let* ((existing (gethash (cons beg line) org-table-widget--row-index)))
+      (unless (eq existing overlay)
+        (delete-overlay existing)
+        (setq org-table-widget--overlays
+              (delq existing org-table-widget--overlays))))
     (puthash (cons beg line) overlay org-table-widget--row-index)
     (push overlay org-table-widget--overlays)
     overlay))
@@ -1323,10 +1333,13 @@ Each row gets an overlay of its own.  Return the overlay of the first
 row.  Revealing the row point rests on is left to
 `org-table-widget--sync-row', so that a caller may draw a table without
 looking at point."
+  ;; Clear the previous drawing first: a table that can no longer be laid
+  ;; out, as while it is being typed into, must not keep rows drawn from the
+  ;; layout it had before the edit.
+  (org-table-widget--drop-table beg)
   (when-let* ((cached (org-table-widget--layout-table beg end window width))
               (widget (nth 1 cached))
               (spans (nth 2 cached)))
-    (org-table-widget--drop-table beg)
     (unless (org-table-widget--revealed-p beg)
       (let (first)
         (dolist (span spans)

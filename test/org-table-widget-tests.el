@@ -813,6 +813,65 @@ Pixel spaces are dropped, so the lines hold only the visible text."
          (should-not org-table-widget--render-cache)
          (should (org-table-widget--table-overlays (point-min))))))))
 
+(ert-deftest org-table-widget-redraw-does-not-stack-overlays ()
+  ;; Overlays are found from the list of them when a table is dropped, not
+  ;; from the per-row index.  A lost or replaced index entry used to leave
+  ;; the old overlay on screen, drawing over the redrawn table.
+  (require 'textui)
+  (org-table-widget-tests--with-org "Before\n| a | 1 |\n| b | 2 |\n| c | 3 |\n"
+    (save-window-excursion
+      (switch-to-buffer (current-buffer))
+      (org-table-widget-tests--with-pixel-mocks
+       (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) t)))
+         (let ((org-table-widget-relayout-delay 3600))
+           (unwind-protect
+               (progn
+                 (org-table-widget-mode 1)
+                 ;; Point rests outside the table, so every row is drawn and
+                 ;; a redraw must replace them all.
+                 (let* ((table (car (org-table-widget--tables)))
+                        (beg (car table))
+                        (end (cdr table))
+                        (drawn (length org-table-widget--overlays)))
+                   (should (> drawn 0))
+                   ;; Lose the index, as an overwritten entry does.
+                   (setq org-table-widget--row-index
+                         (make-hash-table :test 'equal))
+                   (org-table-widget--display-table
+                    beg end (selected-window) 80)
+                   ;; Redrawing replaces the drawing instead of adding to it.
+                   (should (= (length org-table-widget--overlays) drawn))))
+             (org-table-widget-mode -1))))))))
+
+(ert-deftest org-table-widget-row-drawn-once ()
+  ;; Drawing a row twice must not leave the first overlay behind, where
+  ;; nothing could reach it to delete it again.
+  (require 'textui)
+  (org-table-widget-tests--with-org "Before\n| a | 1 |\n| b | 2 |\n"
+    (save-window-excursion
+      (switch-to-buffer (current-buffer))
+      (org-table-widget-tests--with-pixel-mocks
+       (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) t)))
+         (let ((org-table-widget-relayout-delay 3600))
+           (unwind-protect
+               (progn
+                 (org-table-widget-mode 1)
+                 ;; Point stays on "Before", outside the table, so every
+                 ;; row of the table is drawn.
+                 (let* ((beg (car (car (org-table-widget--tables))))
+                        (cached (gethash beg org-table-widget--render-cache))
+                        (widget (nth 1 cached))
+                        (spans (nth 2 cached))
+                        (span (car spans))
+                        (drawn (length org-table-widget--overlays)))
+                   ;; The first row is drawn already, so drawing it again
+                   ;; takes the same index entry.
+                   (should (org-table-widget--row-overlay
+                            (cons beg (car span))))
+                   (org-table-widget--make-row-overlay beg span widget)
+                   (should (= (length org-table-widget--overlays) drawn))))
+             (org-table-widget-mode -1))))))))
+
 (ert-deftest org-table-widget-spans-start-at-line-beginnings ()
   ;; A rendering can lose the source line it was laid out for, leaving a
   ;; repeated or out-of-order offset.  Spans are located from the table start
@@ -960,7 +1019,7 @@ Pixel spaces are dropped, so the lines hold only the visible text."
   (org-table-widget-tests--with-org "| a |\n"
     (let ((gc-cons-threshold 800000)
           observed)
-      (cl-letf (((symbol-function 'textui-layout-widget)
+      (cl-letf (((symbol-function 'org-table-widget--render-rows)
                  (lambda (&rest _)
                    (setq observed gc-cons-threshold)
                    (error "Test layout failure"))))
@@ -977,7 +1036,7 @@ Pixel spaces are dropped, so the lines hold only the visible text."
       (let ((calls 0)
             (width 80)
             (font 1)
-            (layout (symbol-function 'textui-layout-widget))
+            (layout (symbol-function 'org-table-widget--render-rows))
             (org-table-widget-relayout-delay 3600))
         (org-table-widget-tests--with-pixel-mocks
          (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) t))
@@ -985,10 +1044,10 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                     (lambda (_window) width))
                    ((symbol-function 'org-table-widget--font-signature)
                     (lambda (_window) (list font)))
-                   ((symbol-function 'textui-layout-widget)
-                    (lambda (widget columns)
+                   ((symbol-function 'org-table-widget--render-rows)
+                    (lambda (table window columns &optional budget)
                       (cl-incf calls)
-                      (funcall layout widget columns))))
+                      (funcall layout table window columns budget))))
            (unwind-protect
                (progn
                  (org-table-widget-mode 1)
@@ -1069,8 +1128,8 @@ Pixel spaces are dropped, so the lines hold only the visible text."
       (switch-to-buffer (current-buffer))
       (let ((calls 0))
         (cl-letf (((symbol-function 'font-lock-ensure) #'ignore)
-                  ((symbol-function 'textui-layout-widget)
-                   (lambda (&rest _) (cl-incf calls) "rendered")))
+                  ((symbol-function 'org-table-widget--render-rows)
+                   (lambda (&rest _) (cl-incf calls) nil)))
           (org-table-widget--display-table (point-min) (point-max) (selected-window) 80)
           (org-table-widget--clear)
           ;; No live overlay and the mode is off: the key itself must detect
@@ -1144,10 +1203,10 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                     ((symbol-function 'org-table-widget--reserves-continuation-p)
                      #'ignore)
                     ((symbol-function 'font-lock-ensure) #'ignore)
-                    ((symbol-function 'textui-layout-widget)
-                     (lambda (widget width)
-                       (push (list width (widget-get widget :pixel-budget)) seen)
-                       "rendered")))
+                    ((symbol-function 'org-table-widget--render-rows)
+                     (lambda (_table _window width &optional budget)
+                       (push (list width budget) seen)
+                       nil)))
             (org-table-widget--display-table beg end (selected-window) 80)
             (should (equal (car seen) '(80 800)))
             (setq-local line-prefix "  ")
@@ -1182,10 +1241,10 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                     ((symbol-function 'window-fringes)
                      (lambda (&rest _) fringes))
                     ((symbol-function 'font-lock-ensure) #'ignore)
-                    ((symbol-function 'textui-layout-widget)
-                     (lambda (widget width)
-                       (push (list width (widget-get widget :pixel-budget)) seen)
-                       "rendered")))
+                    ((symbol-function 'org-table-widget--render-rows)
+                     (lambda (_table _window width &optional budget)
+                       (push (list width budget) seen)
+                       nil)))
             (let ((overflow-newline-into-fringe t))
               (org-table-widget--display-table beg end (selected-window) 80)
               (should (equal (car seen) '(80 800)))
@@ -1219,10 +1278,10 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                     ((symbol-function 'window-body-height)
                      (lambda (&rest _) body-height))
                     ((symbol-function 'font-lock-ensure) #'ignore)
-                    ((symbol-function 'textui-layout-widget)
-                     (lambda (widget width)
-                       (push (list width (widget-get widget :pixel-budget)) seen)
-                       "rendered")))
+                    ((symbol-function 'org-table-widget--render-rows)
+                     (lambda (_table _window width &optional budget)
+                       (push (list width budget) seen)
+                       nil)))
             (org-table-widget--display-table beg end (selected-window) 80)
             (should (equal (car seen) '(80 800)))
             (setq-local display-line-numbers t)
