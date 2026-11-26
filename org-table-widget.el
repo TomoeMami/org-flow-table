@@ -7,7 +7,7 @@
 ;; Maintainer: yibie <https://github.com/yibie>
 ;; URL: https://github.com/yibie/org-table-widget
 ;; Version: 0.3.1
-;; Package-Requires: ((emacs "29.1") (org "9.6") (textui "0.8.0"))
+;; Package-Requires: ((emacs "29.1") (org "9.6"))
 ;; Keywords: outlines, wp, convenience
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -54,8 +54,9 @@
 ;; Cell contents are copied from the fontified buffer, so links,
 ;; emphasis and code markup keep the faces Org gives them.
 ;;
-;; Layout is provided by TextUI (https://github.com/yibie/textui),
-;; which lays out block widgets inside ordinary Emacs buffers.
+;; Everything here is built on Emacs itself: the cells are measured with
+;; `window-text-pixel-size', laid out here, and drawn with overlays.
+;; Nothing outside Org has to be installed.
 
 ;;; Code:
 
@@ -67,7 +68,6 @@
 (require 'org-table)
 (require 'org-element)
 
-(declare-function textui-layout-widget "textui" (widget width))
 (defvar org-table-widget-mode)
 
 ;;;; Options and faces
@@ -706,24 +706,15 @@ PIXEL-BUDGET, when non-nil, overrides the column-derived pixel budget."
                                                       pixel-budget))
                "\n"))
 
-;;;; TextUI widget
+;;;; Table widget
 
-(defun org-table-widget--layout (widget width)
-  "Lay out table WIDGET within WIDTH columns for TextUI."
-  (let* ((table (widget-get widget :value))
-         (window (or (widget-get widget :window)
-                     (get-buffer-window (current-buffer))
-                     (selected-window)))
-         (rendered (org-table-widget--with-cached-measurements window
-                     (org-table-widget--render table window width
-                                               (widget-get widget :pixel-budget)))))
-    ;; A table of one row renders one line; TextUI wants a block.
-    (if (string-match-p "\n" rendered) rendered (concat rendered "\n"))))
-
+;; A laid-out table is kept in a widget of its own so that the overlays
+;; drawing it can share the table data, the window it was laid out for and
+;; the header line it shows when scrolled past.  Widgets are part of Emacs
+;; (`wid-edit'); the type holds values and draws nothing itself.
 (define-widget 'org-table-widget 'default
   "A width-aware Org table."
-  :format "%v"
-  :textui-layout #'org-table-widget--layout)
+  :format "%v")
 
 ;;;; Parsing Org tables
 
@@ -1179,8 +1170,8 @@ no table.  Layout is cached per table and reused across relayouts."
           ;; recover each row's source line from a text property, and a
           ;; rendering that lost that property merged two rows into one: the
           ;; pair was then drawn on a single line, and the rest of the table
-          ;; shifted.  `textui-layout-widget' only calls the layout function
-          ;; and returns its string, so nothing is gained by the round trip.
+          ;; shifted.  The renderer already returns the rows in order, so
+          ;; nothing is gained by the round trip.
           (let* ((widget (widget-convert 'org-table-widget :value table
                                          :window window
                                          :pixel-budget pixel-budget))
@@ -1686,9 +1677,6 @@ read and edited in place while the rest of the table stays drawn."
         (unless (derived-mode-p 'org-mode)
           (setq org-table-widget-mode nil)
           (user-error "Org table widgets require Org mode"))
-        (unless (require 'textui nil t)
-          (setq org-table-widget-mode nil)
-          (user-error "Org table widgets require TextUI"))
         ;; Reverting normally reinitializes Org mode.  Overlays can survive
         ;; that reset even though the buffer-local ownership list does not.
         (add-hook 'change-major-mode-hook

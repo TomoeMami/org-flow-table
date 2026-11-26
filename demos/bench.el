@@ -16,7 +16,6 @@
   (file-name-directory (or load-file-name buffer-file-name))
   "Directory containing benchmark inputs and outputs.")
 (add-to-list 'load-path (expand-file-name ".." org-table-widget-bench--directory))
-(add-to-list 'load-path (expand-file-name "../../textui" org-table-widget-bench--directory))
 (require 'org-table-widget)
 
 (defun org-table-widget-bench--log (format-string &rest args)
@@ -174,8 +173,6 @@
         (org-table-widget-bench--log "Emacs=%s graphic=%S font=%S gc-cons-threshold=%d time=%s"
                                      emacs-version (display-graphic-p) (face-font 'default)
                                      gc-cons-threshold (current-time-string))
-        ;; Preload the library so mode-on cost is table work, not loading TextUI.
-        (require 'textui)
         (dolist (name '("large.org" "huge.org"))
           (org-table-widget-bench--run name nil)
           (org-table-widget-bench--run name t))

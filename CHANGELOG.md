@@ -4,6 +4,10 @@
 
 ### Changes
 
+- Drop the TextUI dependency. Tables are measured with `window-text-pixel-size`
+  and laid out by this package, so `Package-Requires` lists only Emacs and Org
+  and the mode no longer refuses to start when another library is missing.
+  Nothing has to be cloned alongside the package or added to `load-path`.
 - Keep the Org source table's own look instead of drawing a box around it. Rows
   render as `| cell | cell |` and horizontal rules as `|---+---|`; the drawn
   top and bottom frames and the Unicode box-drawing characters are gone. Header
@@ -41,6 +45,12 @@
 
 ### Breaking changes
 
+- Remove the TextUI dependency and the `:textui-layout` function it used. The
+  `org-table-widget` widget type is still defined, but only as a value holder
+  built on the `wid-edit` library that ships with Emacs; it no longer
+  registers a layout callback, so a caller that passed it to TextUI's own
+  `textui-layout-widget` now has to render the table through this package.
+  TextUI need not be installed, and an existing installation can be removed.
 - Remove the `org-table-widget-use-unicode-borders` and
   `org-table-widget-reveal-on-point` options. Tables now always follow the Org
   source table's shape, and the row under point is always shown as source, so

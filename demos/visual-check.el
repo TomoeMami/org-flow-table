@@ -17,7 +17,6 @@
   (file-name-directory (or load-file-name buffer-file-name))
   "Directory containing visual fixtures and logs.")
 (add-to-list 'load-path (expand-file-name ".." org-table-widget-visual--directory))
-(add-to-list 'load-path (expand-file-name "../../textui" org-table-widget-visual--directory))
 (require 'org-table-widget)
 
 (defun org-table-widget-visual--log (format-string &rest args)

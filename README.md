@@ -1,7 +1,8 @@
 # org-table-widget
 
 Display Org tables as responsive, pixel-aligned widgets inside ordinary Org
-buffers, powered by [TextUI](https://github.com/yibie/textui).
+buffers. It needs nothing but Emacs and Org: cells are measured with
+`window-text-pixel-size`, laid out by this package, and drawn with overlays.
 
 - Align mixed CJK, Latin text, emoji and inline code using pixel widths.
 - Wrap long cells and reflow after window resizing or text scaling.
@@ -25,10 +26,14 @@ Thanks to karthink for the fix and for explaining the multi-line preview edge ca
 
 ## Requirements
 
-Emacs **29.1+**, Org **9.6+**, [TextUI **0.8.0+**](https://github.com/yibie/textui),
-and a **graphical Emacs frame** for rendered widgets by default. In a terminal,
-the mode can be enabled, but automatic rendering is skipped and tables stay as
-editable Org source unless `org-table-widget-enable-in-terminal` is non-nil.
+Emacs **29.1+** and Org **9.6+**. There are no other package dependencies, and
+no external library has to be installed, cloned or added to `load-path`: the
+rendering is built on Emacs itself.
+
+A **graphical Emacs frame** is needed for rendered widgets by default. In a
+terminal, the mode can be enabled, but automatic rendering is skipped and tables
+stay as editable Org source unless `org-table-widget-enable-in-terminal` is
+non-nil.
 
 Terminal rendering is much slower to enable on large tables. After the terminal
 is resized, tables are laid out again on the next key press. Alignment of emoji
@@ -36,18 +41,16 @@ rows may depend on the terminal emulator.
 
 ## Installation
 
-Not on MELPA yet. Install TextUI first, then this package:
+Not on MELPA yet. Install this package on its own; nothing else is needed:
 
 ```elisp
 (require 'package-vc)
-(package-vc-install "https://github.com/yibie/textui")
 (package-vc-install "https://github.com/yibie/org-table-widget" "v0.3.1")
 ```
 
-Alternatively, clone both repositories and add their directories manually:
+Alternatively, clone the repository and add its directory manually:
 
 ```elisp
-(add-to-list 'load-path "/path/to/textui")
 (add-to-list 'load-path "/path/to/org-table-widget")
 (require 'org-table-widget)
 ```
@@ -133,6 +136,27 @@ text. Change them to match your theme; set `org-table-widget-zebra-stripe` to
 `nil` for a single flat band, which leaves the header bold and the rules
 unbanded.
 
+### Dependencies
+
+This package is self-contained. It needs **Emacs 29.1+** and **Org 9.6+**, and
+nothing else: no external rendering library is required, and no extra
+repository has to be cloned or put on `load-path`.
+
+Earlier versions laid tables out with [TextUI](https://github.com/yibie/textui).
+That dependency has been removed. Rows are now taken straight from the
+package's own renderer, measured with `window-text-pixel-size` and drawn with
+overlays. The consequences, in short:
+
+- `Package-Requires` lists only Emacs and Org, so `package-vc` and MELPA-style
+  installers pull in nothing extra.
+- `(require 'org-table-widget)` no longer loads, or needs, any third-party
+  library, so starting the mode cannot fail because something else is missing.
+- The `org-table-widget` widget type still exists, but only as a value holder
+  for the laid-out table; it uses the `wid-edit` library that ships with Emacs
+  and no longer registers a `:textui-layout` function. Code that fed that type
+  to TextUI's own `textui-layout-widget` therefore has to render the table
+  through this package instead.
+
 ### Compatibility
 
 - **`org-modern`:** Set `org-modern-table` to `nil` so the two packages do not
@@ -164,7 +188,7 @@ rendering and shows the source row by row as point moves through the table.
 | Alignment | Supports explicit `<l>`, `<c>` and `<r>` Org cookies, including centered cells. | Infers left or right alignment from the source layout; Markdown center alignment is treated as left alignment. |
 | Presentation | Keeps the Org source table's own look: pipe-delimited cells, ruled divider rows, bold header rows and optional zebra striping across whole rows. | Preserves the source table's shape, with an optional fancy vertical-bar style. |
 | Large tables | Caches measurements and unchanged renderings and has no fixed source-size cutoff. | Defaults to a fixed-pitch fallback for tables larger than 4,000 characters. |
-| Requirements | Emacs 29.1+, Org 9.6+ and TextUI 0.8.0+; currently installed from source or with `package-vc`. | Emacs 26+ with no extra package dependency; available from GNU ELPA. |
+| Requirements | Emacs 29.1+ and Org 9.6+, with no other package dependency; currently installed from source or with `package-vc`. | Emacs 26+ with no extra package dependency; available from GNU ELPA. |
 
 Choose Valign when the main goal is to keep an Org or Markdown table aligned
 while editing it, especially with variable-pitch text or inline images. Choose
@@ -215,7 +239,7 @@ These are single-run measurements on this machine, not guarantees for other setu
 ## Demos and tests
 
 Browse [demos/](demos/) for example tables, benchmarks and visual checks.
-With TextUI checked out alongside this repository, generate the benchmark inputs
+Generate the benchmark inputs
 (including the untracked `huge.org`), then run each GUI script in a separate Emacs:
 
 ```sh
@@ -227,11 +251,11 @@ emacs -Q -l /absolute/path/to/org-table-widget/demos/visual-check.el
 Replace `/absolute/path/to` with your checkout's parent directory. Scripts write
 ignored logs/profiles under `demos/` and screenshots under `demos/shots/`, then exit.
 
-With TextUI checked out alongside this repository, run the full ERT suite:
+Run the full ERT suite from the repository root; it needs nothing beyond Emacs:
 
 ```sh
 cd /path/to/org-table-widget
-emacs -Q --batch -L . -L ../textui -L test -l org-table-widget.el \
+emacs -Q --batch -L . -l org-table-widget.el \
   -l test/org-table-widget-tests.el -l test/org-table-widget-demo-tests.el \
   -f ert-run-tests-batch-and-exit
 ```

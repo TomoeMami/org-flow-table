@@ -4,7 +4,7 @@
 
 ;; Run with:
 ;;   emacs -Q --batch --eval "(setq native-comp-enable-subr-trampolines nil)" \
-;;     -L . -L <textui> -l org-table-widget.el \
+;;     -L . -l org-table-widget.el \
 ;;     -l test/org-table-widget-tests.el -f ert-run-tests-batch-and-exit
 ;;
 ;; Tests replace built-in functions such as `window-text-pixel-size';
@@ -444,7 +444,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
              (org-table-widget-mode -1))))))))
 
 (ert-deftest org-table-widget-terminal-rendering-follows-option ()
-  (require 'textui)
   (org-table-widget-tests--with-org "Before\n| a | b |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -693,7 +692,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
     (should-not org-table-widget--overlays)))
 
 (ert-deftest org-table-widget-overlay-preserves-pixel-spaces-and-newlines ()
-  (require 'textui)
   (dolist (source '("| a | longer |\n| b | x |\n"
                     "| a | longer |\n| b | x |"))
     (org-table-widget-tests--with-org source
@@ -795,7 +793,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
              (org-table-widget-mode -1))))))))
 
 (ert-deftest org-table-widget-edit-keeps-the-other-rows-drawn ()
-  (require 'textui)
   ;; Editing a row keeps the rest of the table rendered: the overlays stay
   ;; where they are and follow the text as it changes.
   (dolist (offset '(0 3 15 17))
@@ -817,7 +814,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
   ;; Overlays are found from the list of them when a table is dropped, not
   ;; from the per-row index.  A lost or replaced index entry used to leave
   ;; the old overlay on screen, drawing over the redrawn table.
-  (require 'textui)
   (org-table-widget-tests--with-org "Before\n| a | 1 |\n| b | 2 |\n| c | 3 |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -846,7 +842,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
 (ert-deftest org-table-widget-row-drawn-once ()
   ;; Drawing a row twice must not leave the first overlay behind, where
   ;; nothing could reach it to delete it again.
-  (require 'textui)
   (org-table-widget-tests--with-org "Before\n| a | 1 |\n| b | 2 |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -912,7 +907,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                do (should (= (nth 3 a) (nth 2 b)))))))
 
 (ert-deftest org-table-widget-rows-cover-their-source-lines ()
-  (require 'textui)
   ;; Source lines a row does not draw itself, such as alignment cookies,
   ;; join the row above them, so no source line stays uncovered.
   (org-table-widget-tests--with-org
@@ -945,7 +939,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
        (should-not org-table-widget--overlays)))))
 
 (ert-deftest org-table-widget-rows-replace-only-their-own-line ()
-  (require 'textui)
   ;; Redisplay extends a `display' replacement to the next change of the
   ;; property's value and compares values with `eq', so rows sharing one
   ;; string object are replaced as a single stretch: only the first row's
@@ -1015,7 +1008,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
         (should-not (eq cache (org-table-widget--measurements (selected-window))))))))
 
 (ert-deftest org-table-widget-layout-gc-threshold-is-dynamically-scoped ()
-  (require 'textui)
   (org-table-widget-tests--with-org "| a |\n"
     (let ((gc-cons-threshold 800000)
           observed)
@@ -1029,7 +1021,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
         (should (= gc-cons-threshold 800000))))))
 
 (ert-deftest org-table-widget-render-cache-reuses-and-invalidates ()
-  (require 'textui)
   (org-table-widget-tests--with-org "Before\n| a | longer |\n| b | x |\n\nAfter\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -1122,7 +1113,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                                after-change-functions)))))))))
 
 (ert-deftest org-table-widget-render-cache-checks-source-properties ()
-  (require 'textui)
   (org-table-widget-tests--with-org "| a |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -1192,7 +1182,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
           (should (equal (buffer-string) "Source")))))))
 
 (ert-deftest org-table-widget-prefix-reduces-layout-budgets-and-invalidates-cache ()
-  (require 'textui)
   (org-table-widget-tests--with-org "| a | b |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -1231,7 +1220,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
 
 (ert-deftest org-table-widget-continuation-column-reduces-layout-budget ()
   (skip-unless (boundp 'overflow-newline-into-fringe))
-  (require 'textui)
   (org-table-widget-tests--with-org "| a | b |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -1262,7 +1250,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
             (should (= 2 (length seen)))))))))
 
 (ert-deftest org-table-widget-line-numbers-reduce-layout-budget ()
-  (require 'textui)
   (org-table-widget-tests--with-org "| a | b |\n"
     (save-window-excursion
       (switch-to-buffer (current-buffer))
@@ -1425,7 +1412,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
 ;;;; Sticky header
 
 (ert-deftest org-table-widget-sticky-header-string ()
-  (require 'textui)
   (org-table-widget-tests--with-org
       "| A | 50% |\n|---+---|\n| 1 | 2 |\n| 3 | 4 |\n"
     (org-table-widget-tests--with-pixel-mocks
@@ -1457,7 +1443,6 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                                :sticky-header))))))
 
 (ert-deftest org-table-widget-sticky-header-follows-window-start ()
-  (require 'textui)
   (org-table-widget-tests--with-org
       "Before\n| A | B |\n|---+---|\n| 1 | 2 |\n| 3 | 4 |\nAfter\n"
     (save-window-excursion
