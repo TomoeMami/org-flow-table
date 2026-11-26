@@ -45,7 +45,7 @@ Not on MELPA yet. Install this package on its own; nothing else is needed:
 
 ```elisp
 (require 'package-vc)
-(package-vc-install "https://github.com/TomoeMami/org-flow-table")
+(package-vc-install "https://github.com/TomoeMami/org-flow-table" "v0.4.0")
 ```
 
 Alternatively, clone the repository and add its directory manually:
@@ -202,7 +202,7 @@ overlays in that region.
 
 ## Status
 
-**0.3.1 is an early release.** It is developed and used day to day on Emacs 32
+**0.4.0 is an early release.** It is developed and used day to day on Emacs 32
 (the development branch), so display behavior on earlier versions gets less
 testing. Reports from Emacs 29, 30 and 31 users are very welcome; please open an
 issue with your Emacs version.

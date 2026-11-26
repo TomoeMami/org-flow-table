@@ -1,10 +1,10 @@
 # Changelog
 
 This project was previously released as `org-table-widget`. Release notes
-up to 0.3.1 keep the names the code had then; every later entry uses the
+up to 0.3.1 keep the names the code had then; 0.4.0 and later use the
 current `org-flow-table` names.
 
-## Unreleased
+## 0.4.0 — org-flow-table, on Emacs alone
 
 ### Changes
 

@@ -6,7 +6,7 @@
 ;; Assisted-by: OpenAI Codex
 ;; Maintainer: yibie <https://github.com/yibie>
 ;; URL: https://github.com/TomoeMami/org-flow-table
-;; Version: 0.3.1
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "29.1") (org "9.6"))
 ;; Keywords: outlines, wp, convenience
 ;; SPDX-License-Identifier: GPL-3.0-or-later
