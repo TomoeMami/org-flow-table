@@ -43,3 +43,24 @@ Emacs 和 Org：单元格用 `window-text-pixel-size` 测量、由本包自行�
 (add-to-list 'load-path "/path/to/org-flow-table")
 (require 'org-flow-table)
 ```
+
+## 配置
+
+推荐的最小配置（直接使用全部默认值）：
+
+```elisp
+(require 'org-flow-table)
+(add-hook 'org-mode-hook #'org-flow-table-mode)
+```
+
+各可配置项可用 `M-x customize-group RET org-flow-table RET` 调整：
+
+| 选项 | 默认值 | 功能说明 |
+| --- | --- | --- |
+| `org-flow-table-enable-in-terminal` | `nil` | 非 nil 时也在文本终端渲染表格控件；否则终端下表格保持为可编辑的 Org 源文本。终端渲染大表格明显更慢，emoji 对齐可能取决于终端模拟器。 |
+| `org-flow-table-zebra-stripe` | `t` | 非 nil 时让渲染的每一行交替背景（斑马纹）；表头行与水平分隔线也随数据行一起分带。 |
+| `org-flow-table-wrap-columns` | `t` | 非 nil 时换行单元格内容使表格适配窗口宽度；nil 时按自然宽度布局每一列。 |
+| `org-flow-table-max-width-fraction` | `1.0` | 表格可占用的窗口正文宽度比例。 |
+| `org-flow-table-relayout-delay` | `0.15` | 窗口缩放后等待重排的空闲秒数；拖动缩放会产生连续事件，等待其停止可只重排一次。0 或负数表示立即重排。 |
+| `org-flow-table-cell-properties` | `(face font-lock-face invisible display mouse-face help-echo keymap follow-link htmlize-link org-emphasis)` | 从缓冲区复制进控件单元格的文本属性；其余属性被丢弃。 |
+| `org-flow-table-sticky-header` | `t` | 非 nil 时，表头滚出视野后在窗口 header line 中保持显示（吸顶表头）；header line 只能容纳一行，多行表头只显示首行。会拖慢大表格滚动，在意流畅度可设为 nil。 |

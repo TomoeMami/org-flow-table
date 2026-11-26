@@ -49,3 +49,24 @@ Or clone the repository and add its directory to `load-path` manually:
 (add-to-list 'load-path "/path/to/org-flow-table")
 (require 'org-flow-table)
 ```
+
+## Configuration
+
+Minimal recommended configuration (uses all defaults):
+
+```elisp
+(require 'org-flow-table)
+(add-hook 'org-mode-hook #'org-flow-table-mode)
+```
+
+Every option can be adjusted with `M-x customize-group RET org-flow-table RET`:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `org-flow-table-enable-in-terminal` | `nil` | When non-nil, render table widgets on text terminals too; otherwise tables stay as editable Org source. Terminal rendering is much slower on large tables, and emoji alignment may depend on the terminal emulator. |
+| `org-flow-table-zebra-stripe` | `t` | When non-nil, alternate the background of the drawn rows; header rows and horizontal rules are striped along with the data rows. |
+| `org-flow-table-wrap-columns` | `t` | When non-nil, wrap cells so the table fits the window width; nil lays every column out at its natural width. |
+| `org-flow-table-max-width-fraction` | `1.0` | Fraction of the window body width available to a table. |
+| `org-flow-table-relayout-delay` | `0.15` | Idle seconds to wait after a window resize before laying tables out; zero or negative relays out immediately. |
+| `org-flow-table-cell-properties` | `(face font-lock-face invisible display mouse-face help-echo keymap follow-link htmlize-link org-emphasis)` | Text properties copied from the buffer into widget cells; every other property is dropped. |
+| `org-flow-table-sticky-header` | `t` | When non-nil, keep a scrolled-off table header in the header line; only its first line fits. Slows scrolling through large tables; set to nil if smooth scrolling matters more. |
