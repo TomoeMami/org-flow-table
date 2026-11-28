@@ -945,6 +945,7 @@ replaced is deleted too.  Such an overlay would otherwise stay on screen
 with no way left to reach it, drawing over the table."
   (when beg
     (setq org-flow-table--dirty (delq beg org-flow-table--dirty))
+    (org-flow-table--forget-table beg)
     (let (keep)
       (dolist (overlay org-flow-table--overlays)
         (if (and (overlay-buffer overlay)
@@ -1026,6 +1027,11 @@ here rather than by an overlay hook.  Look for the table at the edit, in
 the overlays covering it, and in the table point rested in before the
 command, instead of scanning the buffer."
   (when org-flow-table-mode
+    ;; Text inserted or deleted before a drawn table moves the table but
+    ;; leaves the positions recorded for it behind; bring them back in step
+    ;; before the edit is reported to the table it touched.
+    (when (org-flow-table--table-moved beg)
+      (org-flow-table--retag-tables))
     (let* ((beg (min beg (point-max)))
            (end (min end (point-max)))
            (table (or (org-flow-table--table-at beg)
@@ -1047,6 +1053,181 @@ command, instead of scanning the buffer."
                         (overlay-get overlay 'org-flow-table-table)))))
       (when (and table (org-flow-table--edited-p table))
         (org-flow-table--edited table)))))
+
+;;;; Keeping recorded positions in step with the buffer
+
+;; A row overlay is tagged with the position its table started at, and the
+;; row index, the list of edited tables, the revealed tables, the row point
+;; rests on and the render cache are keyed by that position.  Overlays move
+;; with the text they cover, but the positions recorded for them do not: text
+;; inserted or deleted before a table leaves every one of those positions
+;; behind.  Nothing then recognizes the drawn rows as belonging to that
+;; table, so they are never deleted again and the table is drawn a second
+;; time over them.  `org-crypt' moves tables that way whenever it decrypts an
+;; entry into the buffer or encrypts it again before saving; a paragraph
+;; typed above a drawn table does the same.
+;;
+;; Each drawn table keeps a marker on its first line, which Emacs moves along
+;; with the text.  Comparing the marker against the position the rows were
+;; drawn at is what notices the move, and it costs nothing: asking the buffer
+;; instead, with `org-flow-table--table-at', would parse the table again on
+;; every keystroke.
+
+(defvar-local org-flow-table--drawn-starts nil
+  "The (MARKER . START) of every table with drawn rows.
+MARKER follows the table's first line when text moves it; START is where
+its rows were drawn.  The two differ once anything before the table was
+inserted or deleted.")
+
+(defun org-flow-table--register-table (beg)
+  "Note that the table starting at BEG has drawn rows."
+  (unless (seq-some (lambda (entry) (eql (cdr entry) beg))
+                    org-flow-table--drawn-starts)
+    (push (cons (copy-marker beg) beg) org-flow-table--drawn-starts)))
+
+(defun org-flow-table--forget-table (beg)
+  "Drop the mark of the table starting at BEG, which has no drawn rows left.
+The mark can have been left at an older start of the same table, so it is
+matched at BEG as well as by the start it was made with."
+  (setq org-flow-table--drawn-starts
+        (seq-filter (lambda (entry)
+                      (if (or (eql (cdr entry) beg)
+                              (eql (marker-position (car entry)) beg))
+                          (progn (set-marker (car entry) nil) nil)
+                        t))
+                    org-flow-table--drawn-starts)))
+
+(defun org-flow-table--table-moved (position)
+  "Return non-nil when a drawn table at or after POSITION starts elsewhere.
+The marker of a drawn table moves with its first line, so a marker that no
+longer points where the table's rows were drawn means the text before it
+moved and every recorded position of that table has to move as well."
+  (seq-some (lambda (entry)
+              (let ((now (marker-position (car entry))))
+                (and now
+                     (>= now position)
+                     (/= now (cdr entry)))))
+            org-flow-table--drawn-starts))
+
+(defun org-flow-table--shift-spans (spans delta)
+  "Return SPANS with every start and end moved by DELTA."
+  (if (zerop delta)
+      spans
+    (mapcar (lambda (span)
+              (list (nth 0 span) (nth 1 span)
+                    (+ (nth 2 span) delta) (+ (nth 3 span) delta)))
+            spans)))
+
+(defun org-flow-table--retag-tables ()
+  "Move every recorded table position to where its rows now sit.
+Return non-nil when a table moved.
+
+The moves are collected before anything is retagged and applied in one
+pass, so a table whose new start is another table's old start is not moved
+twice.  Laid-out spans and the render cache move with their table: the text
+of the table itself did not change, so nothing has to be measured again."
+  (let ((groups (make-hash-table :test 'eql))
+        (moves nil)
+        (dropped nil))
+    (let (live)
+      (dolist (overlay org-flow-table--overlays)
+        (if (overlay-buffer overlay)
+            (progn
+              (push overlay live)
+              (push overlay (gethash (overlay-get overlay 'org-flow-table-table)
+                                     groups)))
+          ;; Text covering the row was deleted outright.
+          (setq dropped t)))
+      (setq org-flow-table--overlays (nreverse live)))
+    (maphash
+     (lambda (old overlays)
+       (let ((now (or (when-let* ((entry (seq-find (lambda (entry)
+                                                     (eql (cdr entry) old))
+                                                   org-flow-table--drawn-starts)))
+                        (marker-position (car entry)))
+                      ;; A table whose mark was lost still tells where it
+                      ;; starts from any row that was not edited away.
+                      (seq-some (lambda (overlay)
+                                  (org-flow-table--table-at
+                                   (overlay-start overlay)))
+                                overlays))))
+         (when (and now (/= now old))
+           (push (cons old now) moves))))
+     groups)
+    (when moves
+      (let ((record (lambda (entry)
+                      (when-let* ((move (assq (cdr entry) moves)))
+                        (setcdr entry (cdr move))))))
+        (mapc record org-flow-table--drawn-starts)))
+    (when (or moves dropped)
+      (let ((tag-of (lambda (position)
+                      (or (cdr (assq position moves)) position))))
+        (let (updates)
+          (dolist (overlay org-flow-table--overlays)
+            (when-let* ((move (assq (overlay-get overlay 'org-flow-table-table)
+                                    moves)))
+              (push (cons overlay (cdr move)) updates)))
+          (dolist (update updates)
+            (overlay-put (car update) 'org-flow-table-table (cdr update))))
+        (setq org-flow-table--dirty
+              (delq nil (mapcar (lambda (beg)
+                                  (let ((moved (funcall tag-of beg)))
+                                    (and (org-flow-table--table-still-starts-p
+                                          moved)
+                                         moved)))
+                                org-flow-table--dirty)))
+        (let (forget)
+          (setq org-flow-table--revealed
+                (delq nil
+                      (mapcar
+                       (lambda (table)
+                         (let* ((old (car table))
+                                (move (assq old moves))
+                                (beg (if move (cdr move) old))
+                                (end (if move
+                                         (+ (cdr table) (- (cdr move) old))
+                                       (cdr table))))
+                           ;; A revealed table whose start is gone can no
+                           ;; longer be found to be drawn again; let the
+                           ;; relayout below draw it from the buffer.
+                           (if (org-flow-table--table-still-starts-p beg)
+                               (cons beg end)
+                             (setq forget t)
+                             nil)))
+                       org-flow-table--revealed)))
+          (when-let* ((row org-flow-table--point-row)
+                      (move (assq (car row) moves)))
+            (setcar row (cdr move)))
+          (when-let* ((move (assq org-flow-table--point-row-table moves)))
+            (setq org-flow-table--point-row-table (cdr move)))
+          (when forget
+            (org-flow-table--schedule-relayout)))
+        ;; The row index is rebuilt from the retagged rows: rekeying it entry
+        ;; by entry would move one table's rows when they happen to sit at
+        ;; another table's old start.
+        (when org-flow-table--row-index
+          (setq org-flow-table--row-index (make-hash-table :test 'equal))
+          (dolist (overlay org-flow-table--overlays)
+            (puthash (cons (overlay-get overlay 'org-flow-table-table)
+                           (overlay-get overlay 'org-flow-table-line))
+                     overlay org-flow-table--row-index)))
+        (when org-flow-table--render-cache
+          (let ((cache (make-hash-table :test 'eql)))
+            (maphash (lambda (beg cached)
+                       (let ((move (assq beg moves)))
+                         (if move
+                             (let ((delta (- (cdr move) beg)))
+                               (puthash (cdr move)
+                                        (list (car cached) (nth 1 cached)
+                                              (org-flow-table--shift-spans
+                                               (nth 2 cached) delta)
+                                              (+ (nth 3 cached) delta)
+                                              (+ (nth 4 cached) delta))
+                                        cache))
+                           (puthash beg cached cache))))
+                     org-flow-table--render-cache)
+            (setq org-flow-table--render-cache cache)))
+        (or moves dropped)))))
 
 (defconst org-flow-table--layout-gc-threshold (* 64 1024 1024)
   "Minimum GC allocation threshold while building a table widget.")
@@ -1223,6 +1404,7 @@ no table.  Layout is cached per table and reused across relayouts."
 (defun org-flow-table--make-row-overlay (beg span widget)
   "Draw SPAN, a row of the table starting at BEG, and return its overlay.
 WIDGET is the laid-out table the rendering of the row belongs to."
+  (org-flow-table--register-table beg)
   (let ((overlay (make-overlay (nth 2 span) (nth 3 span) nil t nil))
         (line (car span)))
     (overlay-put overlay 'org-flow-table-row t)
@@ -1342,10 +1524,13 @@ looking at point."
 (defun org-flow-table--clear ()
   "Remove every widget overlay from the current buffer."
   (mapc #'delete-overlay org-flow-table--overlays)
+  (mapc (lambda (entry) (set-marker (car entry) nil))
+        org-flow-table--drawn-starts)
   (setq org-flow-table--overlays nil
         org-flow-table--row-index nil
         org-flow-table--point-row nil
-        org-flow-table--dirty nil))
+        org-flow-table--dirty nil
+        org-flow-table--drawn-starts nil))
 
 (defun org-flow-table--renderable-p (window)
   "Return non-nil when widgets may be rendered in WINDOW."
@@ -1441,7 +1626,11 @@ touches two rows: the rest of the table keeps the overlays it has."
       (org-flow-table--hide-row row))))
 
 (defun org-flow-table--forget-revealed ()
-  "Draw a revealed table again once point has left it."
+  "Draw a revealed table again once point has left it.
+The extent recorded when the table was revealed can be stale: replacing
+the text above it, as decrypting or encrypting an entry does, moves the
+table without moving that record.  The table is therefore looked up again
+from the buffer, and left as source when it can no longer be found."
   (when org-flow-table--revealed
     (let* ((point (point))
            (window (org-flow-table--window))
@@ -1451,9 +1640,14 @@ touches two rows: the rest of the table keeps the overlays it has."
         (unless (and (>= point (car table)) (< point (cdr table)))
           (setq org-flow-table--revealed
                 (delq table org-flow-table--revealed))
-          (when (org-flow-table--renderable-p window)
-            (org-flow-table--display-table (car table) (cdr table)
-                                             window width)))))))
+          (when-let* ((live (seq-find
+                             (lambda (live)
+                               (eql (car live)
+                                    (org-flow-table--table-at (car table))))
+                             (org-flow-table--tables)))
+                      ((org-flow-table--renderable-p window)))
+            (org-flow-table--display-table (car live) (cdr live)
+                                           window width)))))))
 
 (defun org-flow-table--cancel-relayout ()
   "Cancel a pending relayout."

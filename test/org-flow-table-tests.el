@@ -49,6 +49,30 @@ Pixel spaces are dropped, so the lines hold only the visible text."
   "Return STRING without properties and without pixel spaces."
   (string-replace "\u200B" "" (substring-no-properties string)))
 
+(defun org-flow-table-tests--orphan-rows ()
+  "Return the drawn rows whose table no longer starts where they say.
+A row carries the position its table started at when it was drawn.  Text
+that moves the table moves the row with it, so a row whose tag is not the
+table it now sits in belongs to no table and can never be deleted again."
+  (seq-filter
+   (lambda (overlay)
+     (and (overlay-buffer overlay)
+          (not (eql (org-flow-table--table-at (overlay-start overlay))
+                    (overlay-get overlay 'org-flow-table-table)))))
+   org-flow-table--overlays))
+
+(defun org-flow-table-tests--rows-drawn-twice ()
+  "Return the source lines more than one drawn row replaces."
+  (let ((seen (make-hash-table :test 'eql))
+        twice)
+    (dolist (overlay org-flow-table--overlays)
+      (when (overlay-buffer overlay)
+        (let ((start (overlay-start overlay)))
+          (if (gethash start seen)
+              (push start twice)
+            (puthash start t seen)))))
+    (delete-dups (nreverse twice))))
+
 ;;;; Parsing
 
 (ert-deftest org-flow-table-parse-header-and-groups ()
@@ -634,6 +658,135 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                  (should (memq start org-flow-table--dirty)))
              (org-flow-table-mode -1))))))))
 
+(ert-deftest org-flow-table-replaced-text-moves-the-drawn-rows ()
+  ;; `org-crypt' replaces a whole entry when it decrypts it into the buffer
+  ;; and replaces it again when it encrypts it before saving, so every table
+  ;; below the entry moves.  The drawn rows move with the text, but the
+  ;; positions recorded for their table do not: nothing then recognizes them
+  ;; as that table's rows, they are never deleted, and the table is drawn a
+  ;; second time over them.
+  (org-flow-table-tests--with-org
+      "* Secret                                                     :crypt:\n\
+-----BEGIN PGP MESSAGE-----\n\
+armored-1\n\
+armored-2\n\
+-----END PGP MESSAGE-----\n\
+\n\
+* Data\n\
+| name | value |\n\
+|------+-------|\n\
+| a    | 1     |\n\
+| b    | 2     |\n"
+    (save-window-excursion
+      (switch-to-buffer (current-buffer))
+      (org-flow-table-tests--with-pixel-mocks
+       (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) t)))
+         (let ((org-flow-table-relayout-delay 3600))
+           (unwind-protect
+               (progn
+                 (org-flow-table-mode 1)
+                 (goto-char (point-min))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 4))
+                 ;; Decrypt the entry: delete the armored block and insert the
+                 ;; plaintext where it was, as `org-decrypt-entry' does.
+                 (let ((beg (save-excursion
+                              (goto-char (point-min))
+                              (search-forward "-----BEGIN PGP MESSAGE-----")
+                              (line-beginning-position)))
+                       (end (save-excursion
+                              (goto-char (point-min))
+                              (search-forward "-----END PGP MESSAGE-----")
+                              (line-end-position))))
+                   (delete-region (1- beg) end)
+                   (insert "\nDecrypted prose.\n\n"
+                           "More prose than the armored block held.\n"))
+                 (should-not (org-flow-table-tests--orphan-rows))
+                 (should-not (org-flow-table-tests--rows-drawn-twice))
+                 ;; The drawn rows still answer to their table.
+                 (goto-char (save-excursion
+                              (goto-char (point-min))
+                              (search-forward "| name | value |")
+                              (line-beginning-position)))
+                 (org-flow-table--pre-command)
+                 (org-flow-table--post-command)
+                 (should-not (org-flow-table-tests--rows-drawn-twice))
+                 ;; One row is source under point; the other three stay drawn.
+                 (should (= (length org-flow-table--overlays) 3))
+                 (goto-char (point-min))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 4))
+                 (should-not (org-flow-table-tests--orphan-rows))
+                 ;; Encrypt it again before saving: the plaintext goes and the
+                 ;; armored block comes back where it was.
+                 (let ((beg (save-excursion
+                              (goto-char (point-min))
+                              (search-forward "Decrypted prose.")
+                              (line-beginning-position)))
+                       (end (save-excursion
+                              (goto-char (point-min))
+                              (search-forward "the armored block held.")
+                              (line-end-position))))
+                   (goto-char beg)
+                   (delete-region beg end)
+                   (insert "-----BEGIN PGP MESSAGE-----\narmored-1\n"
+                           "armored-2\n-----END PGP MESSAGE-----"))
+                 (should-not (org-flow-table-tests--orphan-rows))
+                 (should-not (org-flow-table-tests--rows-drawn-twice))
+                 (goto-char (point-min))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 4)))
+             (org-flow-table-mode -1))))))))
+
+(ert-deftest org-flow-table-typed-text-moves-a-drawn-table ()
+  ;; Typing a paragraph above a drawn table shifts the table just as a
+  ;; replaced entry does; the rows must keep answering to it.
+  (org-flow-table-tests--with-org "Before\n| a |\n| b |\n| c |\nAfter\n"
+    (save-window-excursion
+      (switch-to-buffer (current-buffer))
+      (org-flow-table-tests--with-pixel-mocks
+       (cl-letf (((symbol-function 'display-graphic-p) (lambda (&rest _) t)))
+         (let ((org-flow-table-relayout-delay 3600))
+           (unwind-protect
+               (progn
+                 (org-flow-table-mode 1)
+                 (goto-char (point-min))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 3))
+                 (goto-char (point-min))
+                 (insert "New paragraph\n")
+                 (should-not (org-flow-table-tests--orphan-rows))
+                 (search-forward "| b |")
+                 (beginning-of-line)
+                 (org-flow-table--pre-command)
+                 (org-flow-table--post-command)
+                 (should-not (org-flow-table-tests--rows-drawn-twice))
+                 (should (= (length org-flow-table--overlays) 2))
+                 (goto-char (point-max))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 3))
+                 (should-not (org-flow-table-tests--orphan-rows))
+                 ;; A table laid out again from scratch still follows a later
+                 ;; shift: editing a cell and leaving its row drops the rows
+                 ;; and draws the table again.
+                 (search-backward "| c |")
+                 (beginning-of-line)
+                 (org-flow-table--pre-command)
+                 (org-flow-table--post-command)
+                 (forward-char 2)
+                 (insert "Z")
+                 (goto-char (point-min))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 3))
+                 (goto-char (point-min))
+                 (insert "Third paragraph\n")
+                 (should-not (org-flow-table-tests--orphan-rows))
+                 (should-not (org-flow-table-tests--rows-drawn-twice))
+                 (goto-char (point-max))
+                 (org-flow-table--post-command)
+                 (should (= (length org-flow-table--overlays) 3)))
+             (org-flow-table-mode -1))))))))
+
 (ert-deftest org-flow-table-toggle-reveals-and-draws-a-table ()
   (org-flow-table-tests--with-org "Before\n| a | b |\n| c | d |\nAfter\n"
     (save-window-excursion
@@ -1100,11 +1253,13 @@ Pixel spaces are dropped, so the lines hold only the visible text."
                  (goto-char (point-min))
                  (insert "New paragraph\n")
                  ;; The edit is outside any table: the cache keeps the
-                 ;; tables it already laid out.
+                 ;; tables it already laid out.  The text before the table
+                 ;; moved, so the laid-out table moves with its source
+                 ;; instead of being measured again.
                  (should org-flow-table--render-cache)
                  (goto-char (point-min))
                  (org-flow-table-refresh)
-                 (should (= calls 5))
+                 (should (= calls 4))
                  ;; One overlay for each of the table's two rows.
                  (should (= (length org-flow-table--overlays) 2)))
              (org-flow-table-mode -1)

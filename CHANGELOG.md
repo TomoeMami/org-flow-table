@@ -4,6 +4,27 @@ This project was previously released as `org-table-widget`. Release notes
 up to 0.3.1 keep the names the code had then; 0.4.0 and later use the
 current `org-flow-table` names.
 
+## Unreleased
+
+### Fixes
+
+- Keep tables drawn when text is inserted or deleted above them. A drawn row
+  carries the position its table started at, and the row index, the edited and
+  revealed tables, the row point rests on and the render cache are keyed by that
+  position. Overlays move with the text they cover, but those recorded
+  positions did not: once anything before a table changed, nothing recognized
+  its rows as belonging to it, so they were never deleted and the table was
+  drawn a second time over them, one drawing per row, until
+  `org-flow-table-refresh` ran. `org-crypt` moved tables that way whenever it
+  decrypted an entry into the buffer or encrypted it again before saving, and a
+  paragraph typed above a drawn table did the same. Every drawn table now keeps
+  a marker on its first line, which Emacs moves along with the text, and the
+  recorded positions are moved with it, spans and cached layouts included. The
+  check costs the number of drawn tables rather than the number of rows.
+- Find a table again when point leaves it after `org-flow-table-toggle`. The
+  extent recorded while it was revealed could go stale the same way, and the
+  table was then laid out again from positions that no longer held it.
+
 ## 0.4.0 — org-flow-table, on Emacs alone
 
 ### Changes
